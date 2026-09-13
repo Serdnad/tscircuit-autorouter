@@ -47,6 +47,7 @@ jobs:
           lscpu > results/hardware.txt
           free -h >> results/hardware.txt
           df -h >> results/hardware.txt
+          cat results/hardware.txt
           bun --version > results/bun-version.txt
           git -C typescript rev-parse HEAD > results/typescript-sha.txt
           git -C rust rev-parse HEAD > results/rust-sha.txt
@@ -60,8 +61,23 @@ jobs:
         uses: ./controller/.github/actions/prepare-bindings
         with:
           working-directory: rust
-      - name: Run paired SRJ18 benchmark
-        run: python3 controller/scripts/benchmark/github-arm-comparison.py
+      - name: Save runner metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: runner-metadata
+          path: results
+      - name: Run TypeScript SRJ18 benchmark
+        run: python3 controller/scripts/benchmark/github-arm-comparison.py typescript
+      - name: Save TypeScript results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-srj18
+          path: results
+      - name: Run Rust SRJ18 benchmark
+        run: python3 controller/scripts/benchmark/github-arm-comparison.py rust
+      - name: Compare results
+        run: python3 controller/scripts/benchmark/github-arm-comparison.py report
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4

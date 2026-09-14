@@ -27,8 +27,16 @@ if mode == "typescript":
 reports = {}
 for name in ([mode] if mode in ["typescript", "rust"] else []):
     repo = root / name
+    # Give both revisions a fresh worker for each board, outside the solve timer.
+    worker_source = repo / "scripts/benchmark/index.ts"
+    worker_text = worker_source.read_text()
+    assert worker_text.count("finish(message.result, false)") == 1
+    worker_source.write_text(worker_text.replace("finish(message.result, false)",
+                                                 "finish(message.result, true)"))
     output = results / name
     (output / "traces").mkdir(parents=True)
+    with (output / "harness.patch").open("w") as patch:
+        subprocess.run(["git", "diff"], cwd=repo, stdout=patch, check=True)
     env = dict(os.environ, BENCHMARK_TRACE_DIR=str(output / "traces"))
     command = ["bash", "./benchmark.sh", "--pipeline", "9", "--dataset", "srj18",
                "--effort", "1", "--concurrency", "2", "--sample-timeout", "360s"]
@@ -78,6 +86,7 @@ subprocess.run([
 report = (results / "comparison.md").read_text().replace("one Blacksmith job", "one GitHub Actions job")
 report = report.replace(f"https://github.com/Serdnad/tscircuit-autorouter/commit/{main_sha}",
                         f"https://github.com/tscircuit/tscircuit-autorouter/commit/{main_sha}")
+report += "\nEach board ran in a fresh worker process on both revisions; concurrency 2.\n"
 report += "\n## All boards\n\n| Board | TS | Rust | Speedup | Final routes |\n| --- | ---: | ---: | ---: | --- |\n"
 rows = {name: {row["sampleNumber"]: row for row in data["tests"]} for name, data in reports.items()}
 assert rows["typescript"].keys() == rows["rust"].keys()
